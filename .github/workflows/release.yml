@@ -1,0 +1,44 @@
+name: Release VPM Package
+
+# GitHubでリリースを作成したときに自動実行
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # リポジトリをチェックアウト
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # package.jsonからバージョン番号を取得
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(cat Packages/com.sizimityper.carwindow-shader/package.json | jq -r '.version')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "パッケージバージョン: $VERSION"
+
+      # パッケージをzipに圧縮
+      - name: Create package zip
+        run: |
+          cd Packages/com.sizimityper.carwindow-shader
+          zip -r ../../com.sizimityper.carwindow-shader-${{ steps.version.outputs.version }}.zip .
+          echo "zip作成完了"
+
+      # zipをリリースに添付
+      - name: Upload zip to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: com.sizimityper.carwindow-shader-${{ steps.version.outputs.version }}.zip
+
+      # vpmリポジトリのlisting更新をトリガー
+      - name: Trigger VPM listing update
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.VPM_LISTING_TOKEN }}
+          repository: sizimityper/vpm
+          event-type: update-listing
