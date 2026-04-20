@@ -3,11 +3,11 @@ using UnityEngine;
 using VRC.SDKBase;
 
 /// <summary>
-/// VRChat runtime wiper mesh sync for CarWindow.shader.
+/// CarWindow.shaderのVRChatランタイムワイパーメッシュ同期。
 ///
-/// WiperSync is the master of timing: it computes localT each frame,
-/// drives the mesh pivot, and writes _WiperTimeInCycle to the material.
-/// The shader uses _WiperTimeInCycle directly, guaranteeing perfect sync.
+/// WiperSyncはタイミングのマスター: 毎フレームlocalTを計算し、
+/// メッシュピボットを動かし、_WiperTimeInCycleをマテリアルに書き込む。
+/// シェーダーは_WiperTimeInCycleを直接使用し、完全な同期を保証する。
 /// </summary>
 public class CarWindowWiperSync : UdonSharpBehaviour
 {
@@ -15,7 +15,7 @@ public class CarWindowWiperSync : UdonSharpBehaviour
     public Material carWindowMaterial;
 
     // -------------------------------------------------------
-    //  Baked by CarWindowGizmo — do not edit manually
+    //  CarWindowGizmoによるベイク済み — 手動で編集しないこと
     // -------------------------------------------------------
     [HideInInspector] public bool      bakedReady    = false;
     [HideInInspector] public float     bakedPeriod   = 2.0f;
@@ -25,33 +25,33 @@ public class CarWindowWiperSync : UdonSharpBehaviour
     [HideInInspector] public Vector4[] bakedAngles   = new Vector4[4];
 
     // -------------------------------------------------------
-    //  Mesh-only settings — set manually
+    //  メッシュ専用設定 — 手動で設定
     // -------------------------------------------------------
     [Header("Wiper 0 — mesh only")]
     public Transform w0Pivot;
-    [Tooltip("Angle (deg) the arm points in glassUV space when pivot transform is at identity rotation. 0 = straight up (+Y). Match this to your modeled mesh orientation.")]
+    [Tooltip("ピボットトランスフォームがidentity回転のときにアームがglassUV空間で指す角度（度）。0 = 真上（+Y）。モデリングしたメッシュの向きに合わせること。")]
     public float     w0MeshRestAngle = 0f;
 
     [Header("Wiper 1 — mesh only")]
     public Transform w1Pivot;
-    [Tooltip("Angle (deg) the arm points in glassUV space when pivot transform is at identity rotation.")]
+    [Tooltip("ピボットトランスフォームがidentity回転のときにアームがglassUV空間で指す角度（度）。")]
     public float     w1MeshRestAngle = 0f;
 
     [Header("Wiper 2 — mesh only")]
     public Transform w2Pivot;
-    [Tooltip("Angle (deg) the arm points in glassUV space when pivot transform is at identity rotation.")]
+    [Tooltip("ピボットトランスフォームがidentity回転のときにアームがglassUV空間で指す角度（度）。")]
     public float     w2MeshRestAngle = 0f;
 
     [Header("Wiper 3 — mesh only")]
     public Transform w3Pivot;
-    [Tooltip("Angle (deg) the arm points in glassUV space when pivot transform is at identity rotation.")]
+    [Tooltip("ピボットトランスフォームがidentity回転のときにアームがglassUV空間で指す角度（度）。")]
     public float     w3MeshRestAngle = 0f;
 
     private Material mat;
 
     void Start()
     {
-        // Create a per-instance material so duplicated objects don't share state
+        // 複製したオブジェクト間でStateが共有されないようインスタンスごとのマテリアルを作成
         Renderer rend = GetComponent<Renderer>();
         mat = (rend != null) ? rend.material : carWindowMaterial;
     }
@@ -60,7 +60,7 @@ public class CarWindowWiperSync : UdonSharpBehaviour
     {
         if (mat == null) return;
 
-        // Push baked geometry + angles to material (only if baked by CarWindowGizmo)
+        // ベイク済みジオメトリ + 角度をマテリアルに転送（CarWindowGizmoによるベイク済みの場合のみ）
         if (bakedReady)
         {
             mat.SetVectorArray("_WiperPivotArm", bakedPivotArm);
@@ -76,7 +76,7 @@ public class CarWindowWiperSync : UdonSharpBehaviour
         float halfP    = period * 0.5f;
         float localT   = Mathf.Repeat(Time.time, cycleDur);
 
-        // Drive shader with the same localT — perfect sync guaranteed
+        // 同じlocalTでシェーダーを駆動 — 完全な同期を保証
         mat.SetFloat("_WiperTimeInCycle", localT);
 
         float t01 = 0f;
@@ -91,7 +91,7 @@ public class CarWindowWiperSync : UdonSharpBehaviour
 
     void ApplyWiper(Transform pivot, float meshRestAngle, Vector4 wiperAngle, float t01)
     {
-        // wiperAngle: (angleMin, angleMax, enabled, direction)
+        // wiperAngle: (最小角度, 最大角度, 有効フラグ, 方向)
         if (pivot == null || wiperAngle.z < 0.5f) return;
 
         float angleMin = wiperAngle.x;

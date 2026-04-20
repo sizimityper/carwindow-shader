@@ -1,11 +1,11 @@
 using UnityEngine;
 
 /// <summary>
-/// Editor-only Gizmo visualizer for CarWindow.shader wiper geometry.
-/// Attach to the same GameObject as the glass MeshRenderer.
-/// Converts glassUV (0-1) to world space via barycentric interpolation of the
-/// actual mesh geometry, so non-planar (curved) meshes are supported.
-/// Falls back to standard-quad mapping if no MeshFilter is found.
+/// CarWindow.shaderのワイパージオメトリを可視化するエディタ専用Gizmo。
+/// ガラスのMeshRendererと同じGameObjectに付ける。
+/// 実際のメッシュジオメトリの重心補間を通じてglassUV（0-1）をワールド空間に変換するため、
+/// 非平面（曲面）メッシュにも対応。
+/// MeshFilterが見つからない場合は標準クワッドマッピングにフォールバック。
 /// </summary>
 [ExecuteInEditMode]
 public class CarWindowGizmo : MonoBehaviour
@@ -13,7 +13,7 @@ public class CarWindowGizmo : MonoBehaviour
     public Material targetMaterial;
 
     [Space]
-    [Tooltip("Assign CarWindowWiperSync to bake wiper data for VRChat runtime")]
+    [Tooltip("VRChatランタイム用にワイパーデータをベイクするためCarWindowWiperSyncを割り当てる")]
     public CarWindowWiperSync wiperSync;
 
     [Header("Timing")]
@@ -30,11 +30,11 @@ public class CarWindowGizmo : MonoBehaviour
     };
 
     // -------------------------------------------------------
-    //  Data push (edit time + play time)
+    //  データ転送（編集時 + プレイ時）
     // -------------------------------------------------------
     void OnValidate()   { CacheMesh(); PushToMaterial(); BakeToWiperSync(); }
     void OnDrawGizmos() { CacheMesh(); PushToMaterial(); DrawGizmos(); }
-    void Update()       { PushToMaterial(); }  // keeps material correct in editor Play mode
+    void Update()       { PushToMaterial(); }  // エディタのPlayモードでマテリアルを正しく保つ
 
     void PushToMaterial()
     {
@@ -47,11 +47,11 @@ public class CarWindowGizmo : MonoBehaviour
         for (int i = 0; i < 4; i++)
         {
             WiperConfig w = SafeWiper(i);
-            // Both modes use the same pivot/arm/angles layout
+            // 全モードで同じpivot/arm/anglesレイアウトを使用
             pivotArm[i] = new Vector4(w.pivotPos.x, w.pivotPos.y, w.armLength, w.bladeYOffset);
             angles[i]   = new Vector4(w.armAngleMin, w.armAngleMax, w.enabled ? 1f : 0f, w.direction);
-            // Mode 0: bladeAngle=0 → perpendicular-to-arm (add +90° for shader convention)
-            // Mode 1: bladeAngle=0 → horizontal in UV space (no offset needed)
+            // モード0: bladeAngle=0 → アームに垂直（シェーダー規約のため+90°追加）
+            // モード1: bladeAngle=0 → UV空間で水平（オフセット不要）
             float bladeAngDeg = w.bladeAngle + 90f;
             blade[i] = new Vector4(bladeAngDeg, w.bladeSMin, w.bladeSMax, (float)w.wiperMode);
         }
@@ -95,13 +95,13 @@ public class CarWindowGizmo : MonoBehaviour
     }
 
     // -------------------------------------------------------
-    //  Gizmo drawing
+    //  Gizmo描画
     // -------------------------------------------------------
     void DrawGizmos()
     {
         if (targetMaterial == null) return;
 
-        // Per-wiper colours
+        // ワイパーごとの色
         Color[] colors = {
             new Color(0.2f, 1.0f, 0.3f),
             new Color(0.3f, 0.6f, 1.0f),
@@ -118,15 +118,15 @@ public class CarWindowGizmo : MonoBehaviour
 
             if (w.wiperMode == WiperMode.Train)
             {
-                // --- Parallel crank mode: fan sweep, blade fixed in UV space ---
+                // --- 平行クランクモード: 扇形スイープ、UV空間で固定されたブレード ---
                 float betaFixed = (w.bladeAngle + 90f) * Mathf.Deg2Rad;
                 Vector2 bladeDirFixed = new Vector2(Mathf.Cos(betaFixed), -Mathf.Sin(betaFixed));
 
-                // Pivot sphere
+                // ピボット球
                 Gizmos.color = col;
                 Gizmos.DrawSphere(GlassToWorld(w.pivotPos), 0.008f);
 
-                // Sweep envelope (24 steps, fixed blade direction)
+                // スイープ範囲（24ステップ、固定ブレード方向）
                 const int stepsPC = 24;
                 for (int st = 0; st <= stepsPC; st++)
                 {
@@ -140,7 +140,7 @@ public class CarWindowGizmo : MonoBehaviour
                                     GlassToWorld(bladeCtr + bladeDirFixed * w.bladeSMax));
                 }
 
-                // Key positions: angleMin (cyan), mid (col), angleMax (white)
+                // キー位置: angleMin（シアン）、中間（col）、angleMax（白）
                 float[] pcAngles = { w.armAngleMin, (w.armAngleMin + w.armAngleMax) * 0.5f, w.armAngleMax };
                 Color[]  pcCols  = { Color.cyan, col, Color.white };
                 for (int k = 0; k < 3; k++)
@@ -158,7 +158,7 @@ public class CarWindowGizmo : MonoBehaviour
             }
             else
             {
-                // --- Pivot mode ---
+                // --- ピボットモード ---
                 Gizmos.color = col;
                 Gizmos.DrawSphere(GlassToWorld(w.pivotPos), 0.008f);
 
@@ -200,25 +200,25 @@ public class CarWindowGizmo : MonoBehaviour
         Vector2 armTip   = w.pivotPos + armDir  * w.armLength;
         Vector2 bladeCtr = armTip     + perpDir * w.bladeYOffset;
 
-        // Blade direction in glassUV space
+        // glassUV空間でのブレード方向
         float   ba       = theta - beta;
         Vector2 bladeDir = new Vector2(Mathf.Cos(ba), -Mathf.Sin(ba));
 
         Vector2 bs = bladeCtr + bladeDir * w.bladeSMin;
         Vector2 be = bladeCtr + bladeDir * w.bladeSMax;
 
-        // Arm
+        // アーム
         Gizmos.color = col;
         Gizmos.DrawLine(GlassToWorld(w.pivotPos), GlassToWorld(armTip));
 
-        // Blade center marker
+        // ブレード中心マーカー
         Gizmos.DrawSphere(GlassToWorld(bladeCtr), 0.005f);
 
-        // Blade
+        // ブレード
         Gizmos.DrawLine(GlassToWorld(bs), GlassToWorld(be));
     }
 
-    // Blade start/end helpers (for envelope drawing)
+    // ブレード始端/終端ヘルパー（範囲描画用）
     Vector2 BladeStart(WiperConfig w, float theta)
     {
         float beta = (w.bladeAngle + 90f) * Mathf.Deg2Rad;
@@ -244,7 +244,7 @@ public class CarWindowGizmo : MonoBehaviour
     }
 
     // -------------------------------------------------------
-    //  Mesh-based UV → world mapping
+    //  メッシュベースのUV → ワールド変換
     // -------------------------------------------------------
     Mesh     _cachedMesh;
     Vector2[] _cachedUVs;
@@ -269,9 +269,9 @@ public class CarWindowGizmo : MonoBehaviour
         _cachedTris  = m.triangles;
     }
 
-    // glassUV (0-1) → world via barycentric interpolation over the actual mesh.
-    // For UVs outside all triangles (e.g. arm tip beyond glass edge), extrapolates
-    // from the nearest triangle instead of jumping to an unrelated fallback position.
+    // glassUV（0-1）→ 実際のメッシュの重心補間でワールド座標に変換。
+    // 全三角形の外側のUV（例: ガラス端を超えたアーム先端）の場合、
+    // 無関係なフォールバック位置へ飛ばず、最近傍の三角形から外挿する。
     Vector3 GlassToWorld(Vector2 uv)
     {
         if (_cachedTris != null && _cachedUVs != null && _cachedUVs.Length > 0)
@@ -294,26 +294,26 @@ public class CarWindowGizmo : MonoBehaviour
                 float bw = (d00 * d21 - d01 * d20) / denom;
                 float bu = 1f - bv - bw;
 
-                // Score = 0 inside triangle; sum of negative bary magnitudes outside.
+                // スコア = 三角形内部で0; 外側では負の重心座標の絶対値の合計
                 float score = Mathf.Max(0f, -bu) + Mathf.Max(0f, -bv) + Mathf.Max(0f, -bw);
                 if (score < bestScore)
                 {
                     bestScore = score;
                     bestLocal = bu * _cachedVerts[i0] + bv * _cachedVerts[i1] + bw * _cachedVerts[i2];
-                    if (bestScore < 1e-6f) break;  // Exact hit — no need to keep searching
+                    if (bestScore < 1e-6f) break;  // 完全一致 — 探索を続ける必要なし
                 }
             }
             return transform.TransformPoint(bestLocal);
         }
 
-        // Fallback: standard quad (local = UV - 0.5)
+        // フォールバック: 標準クワッド（local = UV - 0.5）
         return transform.TransformPoint(new Vector3(uv.x - 0.5f, uv.y - 0.5f, 0f));
     }
 
     public enum WiperMode { Car = 0, Train = 1 }
 
     // -------------------------------------------------------
-    //  Per-wiper configuration
+    //  ワイパーごとの設定
     // -------------------------------------------------------
     [System.Serializable]
     public class WiperConfig
@@ -336,7 +336,7 @@ public class CarWindowGizmo : MonoBehaviour
         [Header("Sweep  (Pivot mode)")]
         public float   armAngleMin  = -40f;
         public float   armAngleMax  =  40f;
-        [Tooltip("+1 = starts at angleMin  |  -1 = starts at angleMax")]
+        [Tooltip("+1 = angleMinから開始  |  -1 = angleMaxから開始")]
         public float   direction    =  1f;
 
     }
