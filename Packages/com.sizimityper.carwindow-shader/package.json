@@ -1,7 +1,7 @@
 {
   "name": "com.sizimityper.carwindow-shader",
   "displayName": "sizimityper car window shader",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "unity": "2019.4",
   "description": "Car window shader by sizimityper",
   "author": {

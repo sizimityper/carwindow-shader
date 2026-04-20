@@ -2,29 +2,29 @@ Shader "Custom/CarWindow"
 {
     Properties
     {
-        // --- Rain beads ---
+        // --- 雨粒 ---
         _RainAmount    ("Rain Amount",          Range(0,1))   = 0.7
         _DropScale     ("Drop Scale",           Range(0.1,20)) = 1.0
         _RefractionStr ("Refraction Strength",  Range(0,1)) = 0.15
         _ReformRate    ("Drop Reform Rate",     Range(0.05,10)) = 0.3
 
-        // --- Frost ---
+        // --- 霜 ---
         _FrostAmount   ("Frost Amount",         Range(0,1))   = 0.0
         _FrostColor    ("Frost Color",          Color)        = (0.95, 0.97, 1.0, 1.0)
 
-        // --- Glass ---
+        // --- ガラス ---
         _GlassTint     ("Glass Tint",           Color)        = (0.92, 0.96, 1.0, 1.0)
         _Reflectivity  ("Reflectivity",          Range(0,1))   = 0.8
 
-        // --- Rim lighting ---
+        // --- リムライティング ---
         _RimStrength   ("Rim Strength",          Range(0, 3))  = 0.8
         _RimColor      ("Rim Color",             Color)        = (0.8, 0.9, 1.0, 1.0)
 
-        // --- Wiper streak ---
+        // --- ワイパー筋 ---
         _WiperStreakWidth    ("Wiper Edge Streak Width", Range(0, 0.05)) = 0.005
         _WiperArcStreakWidth ("Wiper Arc Streak Width",  Range(0, 0.05)) = 0.005
 
-        // --- Rendering ---
+        // --- レンダリング ---
         [Enum(UnityEngine.Rendering.CullMode)] _CullMode ("Cull Mode", Float) = 0
     }
 
@@ -51,11 +51,11 @@ Shader "Custom/CarWindow"
 
             #include "UnityCG.cginc"
 
-            // ---------- samplers ----------
+            // ---------- サンプラー ----------
             sampler2D _GrabTexture;
             float4    _GrabTexture_TexelSize;
 
-            // ---------- scalar properties ----------
+            // ---------- スカラープロパティ ----------
             float  _RainAmount;
             float  _DropScale;
             float  _RefractionStr;
@@ -68,22 +68,22 @@ Shader "Custom/CarWindow"
             float4 _RimColor;
             float  _WiperPeriod;
             float  _WiperInterval;
-            float  _WiperTimeInCycle;  // set each frame by CarWindowWiperSync
+            float  _WiperTimeInCycle;  // CarWindowWiperSyncが毎フレーム設定
             float4 _GlassTint;
             float  _Reflectivity;
 
-            // ---------- wiper arrays ----------
-            // Set each frame by CarWindowGizmo via Material.SetVectorArray.
+            // ---------- ワイパー配列 ----------
+            // CarWindowGizmoがMaterial.SetVectorArray経由で毎フレーム設定
             // _WiperPivotArm[i] = (pivotX, pivotY, armLength, bladeYOffset)
             // _WiperBlade[i]    = (bladeAngle_deg, bladeSMin, bladeSMax, 0)
             // _WiperAngles[i]   = (armAngleMin_deg, armAngleMax_deg, enabled, direction)
-            //   direction: +1 = starts at angleMin, -1 = starts at angleMax
+            //   direction: +1 = angleMinから開始, -1 = angleMaxから開始
             uniform float4 _WiperPivotArm[4];
             uniform float4 _WiperBlade[4];
             uniform float4 _WiperAngles[4];
 
             // =========================================================
-            //  Structs
+            //  構造体
             // =========================================================
             struct appdata
             {
@@ -102,7 +102,7 @@ Shader "Custom/CarWindow"
             };
 
             // =========================================================
-            //  Box projection helper
+            //  ボックス投影ヘルパー
             // =========================================================
             float3 BoxProjectDir(float3 r, float3 wPos,
                                  float4 pp, float4 bMin, float4 bMax)
@@ -121,24 +121,24 @@ Shader "Custom/CarWindow"
             }
 
             // =========================================================
-            //  Hash helpers
+            //  ハッシュヘルパー
             // =========================================================
             float  h1(float2 p) { return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453); }
             float2 h2(float2 p) { return float2(h1(p), h1(p + float2(31.41, 27.18))); }
 
             // =========================================================
-            //  Wiper test
-            //  Returns float2(inZone, accumFactor)
-            //    inZone:      1 if pixel is within this arm's sweep envelope
-            //    accumFactor: 0 = just wiped,  1 = fully re-accumulated
+            //  ワイパーテスト
+            //  float2(inZone, accumFactor) を返す
+            //    inZone:      ピクセルがこのアームのスイープ範囲内なら1
+            //    accumFactor: 0 = 直後にワイプ,  1 = 完全に再蓄積
             //
-            //  Math derivation (arm local frame: X=arm dir, Y=perp, Z=out):
-            //    Blade center at arm angle θ:
+            //  数学的導出 (アーム局所座標: X=アーム方向, Y=垂直, Z=外向き):
+            //    アーム角度θでのブレード中心:
             //      B(θ) = pivot + L*(sinθ,cosθ) + d*(cosθ,−sinθ)
-            //    Blade direction: (cos(θ−β), −sin(θ−β))  where β = bladeAngle
-            //    Perpendicular condition Q on blade → after trig simplification:
+            //    ブレード方向: (cos(θ−β), −sin(θ−β))  ここでβ = bladeAngle
+            //    ブレード上の直交条件Q → 三角関数の簡略化後:
             //      R·sin(θ−β + atan2(Δy,Δx)) = K,  K = L·cosβ − d·sinβ
-            //    Two crossing angles:
+            //    2つの交差角度:
             //      θ = β − atan2(Δy,Δx) ± arcsin(K/R)
             // =========================================================
             float2 WiperTest(float2 uv, int idx)
@@ -154,7 +154,7 @@ Shader "Custom/CarWindow"
                 float cycleDur    = period + max(_WiperInterval, 0.0);
                 float timeInCycle = _WiperTimeInCycle;
 
-                // ---- Pivot-angle mode (shared params) ----
+                // ---- ピボット角度モード（共通パラメータ）----
                 float2 pivot  = _WiperPivotArm[idx].xy;
                 float  L      = _WiperPivotArm[idx].z;
                 float  bladeY = _WiperPivotArm[idx].w;
@@ -170,10 +170,10 @@ Shader "Custom/CarWindow"
                     dir    = -dir;
                 }
 
-                // ---- Parallel crank mode (mode 1): fan sweep + fixed blade in UV space ----
+                // ---- 平行クランクモード（モード1）: 扇形スイープ + UV空間で固定されたブレード ----
                 if (mode > 0.5)
                 {
-                    float2 bladeDir  = float2(cos(beta), -sin(beta));  // fixed in UV space
+                    float2 bladeDir  = float2(cos(beta), -sin(beta));  // UV空間で固定
                     float2 bladePerp = float2(sin(beta),  cos(beta));
 
                     float M   = sqrt(L * L + bladeY * bladeY);
@@ -222,7 +222,7 @@ Shader "Custom/CarWindow"
                     return float2(inZone1, saturate(bestSince1 / (period * _ReformRate)));
                 }
 
-                // ---- Pivot-angle mode (mode 0) ----
+                // ---- ピボット角度モード（モード0）----
                 float2 delta = uv - pivot;
                 float  R     = length(delta);
                 if (R < 1e-5) return float2(0, 1);
@@ -270,9 +270,9 @@ Shader "Custom/CarWindow"
             }
 
             // =========================================================
-            //  Wiper angular edge streak
-            //  Water film that accumulates at armAngleMin / armAngleMax edges.
-            //  Returns a refraction normal contribution.
+            //  ワイパー角度エッジ筋
+            //  armAngleMin / armAngleMaxのエッジに蓄積する水膜
+            //  屈折法線への寄与を返す
             // =========================================================
             float2 WiperEdgeStreak(float2 uv, int idx)
             {
@@ -285,7 +285,7 @@ Shader "Custom/CarWindow"
                 float  sw    = max(_WiperStreakWidth, 1e-5);
                 float2 streakNorm = float2(0, 0);
 
-                // ---- Parallel crank mode: angle edges at tMin / tMax, fixed blade direction ----
+                // ---- 平行クランクモード: tMin / tMaxでの角度エッジ、固定ブレード方向 ----
                 if (mode > 0.5)
                 {
                     float2 pivot  = _WiperPivotArm[idx].xy;
@@ -295,7 +295,7 @@ Shader "Custom/CarWindow"
                     float  tMax   = _WiperAngles[idx].y * (3.14159265 / 180.0);
                     if (tMax < tMin) { float tmp = tMin; tMin = tMax; tMax = tmp; }
 
-                    float2 bladeDir  = float2(cos(beta), -sin(beta));  // fixed in UV space
+                    float2 bladeDir  = float2(cos(beta), -sin(beta));  // UV空間で固定
                     float2 bladePerp = float2(sin(beta),  cos(beta));
 
                     [unroll]
@@ -317,7 +317,7 @@ Shader "Custom/CarWindow"
                     return streakNorm * _RainAmount;
                 }
 
-                // ---- Pivot mode ----
+                // ---- ピボットモード ----
                 float2 pivot  = _WiperPivotArm[idx].xy;
                 float  L      = _WiperPivotArm[idx].z;
                 float  bladeY = _WiperPivotArm[idx].w;
@@ -349,9 +349,9 @@ Shader "Custom/CarWindow"
             }
 
             // =========================================================
-            //  Wiper arc streak
-            //  Water film at the outer (sMax) and inner (sMin) arc boundaries.
-            //  Uses the same crossing-theta math as WiperTest.
+            //  ワイパー弧状筋
+            //  弧の外側（sMax）と内側（sMin）の境界における水膜
+            //  WiperTestと同じ交差theta計算を使用
             // =========================================================
             float2 WiperArcStreak(float2 uv, int idx)
             {
@@ -364,7 +364,7 @@ Shader "Custom/CarWindow"
                 float  sw    = max(_WiperArcStreakWidth, 1e-5);
                 float2 streakNorm = float2(0, 0);
 
-                // ---- Parallel crank mode: fan sweep + fixed blade, same arc crossing math ----
+                // ---- 平行クランクモード: 扇形スイープ + 固定ブレード、同じ弧交差計算 ----
                 if (mode > 0.5)
                 {
                     float2 pivot  = _WiperPivotArm[idx].xy;
@@ -377,7 +377,7 @@ Shader "Custom/CarWindow"
                     if (abs(tRange2) < 0.001) return float2(0, 0);
                     if (tRange2 < 0.0) { float tmp = tMin; tMin = tMax; tMax = tmp; }
 
-                    float2 bladeDir  = float2(cos(beta), -sin(beta));  // fixed in UV space
+                    float2 bladeDir  = float2(cos(beta), -sin(beta));  // UV空間で固定
                     float2 bladePerp = float2(sin(beta),  cos(beta));
 
                     float M2  = sqrt(L * L + bladeY * bladeY);
@@ -410,7 +410,7 @@ Shader "Custom/CarWindow"
                     return streakNorm * _RainAmount;
                 }
 
-                // ---- Pivot mode ----
+                // ---- ピボットモード ----
                 float2 pivot  = _WiperPivotArm[idx].xy;
                 float  L      = _WiperPivotArm[idx].z;
                 float  bladeY = _WiperPivotArm[idx].w;
@@ -456,16 +456,16 @@ Shader "Custom/CarWindow"
             }
 
             // =========================================================
-            //  Bead drop normal
-            //  Returns xy screen-space refraction normal.
-            //  dynamic=0: static beads (always visible)
-            //  dynamic=1: beads appear suddenly when accumFactor > birthThreshold
+            //  水滴法線
+            //  スクリーン空間の屈折法線（xy）を返す
+            //  dynamic=0: 静的な水滴（常に表示）
+            //  dynamic=1: accumFactorがbirthThresholdを超えると水滴が現れる
             // =========================================================
             float2 BeadNormal(float2 uv, float dynamic, float accumFactor)
             {
                 float2 norm = float2(0, 0);
 
-                // Three scales: large / medium / small drops
+                // 3スケール: 大 / 中 / 小の水滴
                 [unroll]
                 for (int sc = 0; sc < 3; sc++)
                 {
@@ -477,7 +477,7 @@ Shader "Custom/CarWindow"
                     float2 cellID   = floor(scaledUV);
                     float2 cellUV   = frac(scaledUV);
 
-                    // Medium/small drops: skip if inside a large drop
+                    // 中/小の水滴: 大きな水滴の内側ならスキップ
                     if (sc >= 1)
                     {
                         float2 lUV     = uv * (5.0 * _DropScale);
@@ -490,7 +490,7 @@ Shader "Custom/CarWindow"
                         if (length(lCellUV - lCenter) < lR) continue;
                     }
 
-                    // Small drops: also skip if inside a medium drop
+                    // 小さな水滴: 中くらいの水滴の内側ならスキップ
                     if (sc == 2)
                     {
                         float2 mUV     = uv * (8.0 * _DropScale);
@@ -507,11 +507,11 @@ Shader "Custom/CarWindow"
                     float2 center = 0.1 + rnd * 0.8;
                     float  r      = 0.08 + h1(cellID + float2(sc * 1.9, 0.7)) * maxR;
 
-                    // Clamp radius so the drop never crosses into adjacent cells
+                    // 水滴が隣接するセルにはみ出さないよう半径をクランプ
                     float maxFit = min(min(center.x, 1.0 - center.x), min(center.y, 1.0 - center.y));
                     r = min(r, maxFit);
 
-                    // Dynamic: appear only once accumFactor exceeds per-cell threshold
+                    // 動的: accumFactorがセルごとの閾値を超えたときのみ現れる
                     float birth    = h1(cellID + float2(sc * 2.7, 5.1));
                     float appeared = (dynamic > 0.5) ? step(birth, accumFactor) : 1.0;
 
@@ -519,7 +519,7 @@ Shader "Custom/CarWindow"
                     float  dist = length(d);
                     if (dist >= r) continue;
 
-                    // Outward spherical normal; magnitude ∝ dist/r (0 at centre, 1 at edge)
+                    // 外向き球面法線; 大きさ ∝ dist/r（中心で0、端で1）
                     float2 n = d / (r + 1e-5);   // magnitude = dist/r
                     norm += n * appeared * _RainAmount;
                 }
@@ -528,7 +528,7 @@ Shader "Custom/CarWindow"
             }
 
             // =========================================================
-            //  Vertex shader
+            //  頂点シェーダー
             // =========================================================
             v2f vert(appdata v)
             {
@@ -537,19 +537,19 @@ Shader "Custom/CarWindow"
                 o.grabPos  = ComputeGrabScreenPos(o.pos);
                 o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
                 o.worldNorm= UnityObjectToWorldNormal(v.normal);
-                // Car shader: glassUV = raw texcoord, Y-up = top of windshield
+                // glassUV = そのままのテクスチャ座標、Y上 = フロントガラスの上部
                 o.glassUV  = v.texcoord.xy;
                 return o;
             }
 
             // =========================================================
-            //  Fragment shader
+            //  フラグメントシェーダー
             // =========================================================
             float4 frag(v2f i, float facing : VFACE) : SV_Target
             {
                 float2 glassUV = i.glassUV;
 
-                // --- Wiper zone test: call once per wiper, store as scalars (no dynamic indexing) ---
+                // --- ワイパーゾーンテスト: ワイパーごとに1回呼び出し、スカラーとして保存（動的インデックス不可）---
                 float wz0 = 0, wa0 = 1, wz1 = 0, wa1 = 1, wz2 = 0, wa2 = 1, wz3 = 0, wa3 = 1;
                 if (_WiperAngles[0].z >= 0.5) { float2 r = WiperTest(glassUV, 0); wz0 = r.x; wa0 = r.y; }
                 if (_WiperAngles[1].z >= 0.5) { float2 r = WiperTest(glassUV, 1); wz1 = r.x; wa1 = r.y; }
@@ -563,12 +563,12 @@ Shader "Custom/CarWindow"
                 if (wz2 > 0.5) accumFactor = min(accumFactor, wa2);
                 if (wz3 > 0.5) accumFactor = min(accumFactor, wa3);
 
-                // --- Bead normals ---
+                // --- 水滴法線 ---
                 float2 dropNorm = BeadNormal(glassUV, inZone, accumFactor);
 
-                // --- Wiper edge + arc streaks ---
-                // Each wiper's streak is masked out wherever any OTHER wiper's zone is active.
-                // otherZone for wiper N = max of wz* for all wipers except N.
+                // --- ワイパーエッジ + 弧状筋 ---
+                // 各ワイパーの筋は、他のワイパーのゾーンがアクティブな場所でマスクされる
+                // ワイパーNのotherZone = N以外の全ワイパーのwz*の最大値
                 float2 streakNorm = float2(0, 0);
                 streakNorm += (WiperEdgeStreak(glassUV, 0) + WiperArcStreak(glassUV, 0)) * (1.0 - max(max(wz1, wz2), wz3));
                 streakNorm += (WiperEdgeStreak(glassUV, 1) + WiperArcStreak(glassUV, 1)) * (1.0 - max(max(wz0, wz2), wz3));
@@ -576,11 +576,11 @@ Shader "Custom/CarWindow"
                 streakNorm += (WiperEdgeStreak(glassUV, 3) + WiperArcStreak(glassUV, 3)) * (1.0 - max(max(wz0, wz1), wz2));
                 dropNorm += streakNorm * 0.5;
 
-                // --- GrabPass refraction + frost blur ---
+                // --- GrabPass屈折 + 霜ブラー ---
                 float2 grabUV = i.grabPos.xy / i.grabPos.w;
                 grabUV += dropNorm * _RefractionStr;
 
-                // Frost is cleared by wiper (follows accumFactor) and absent under drops
+                // 霜はワイパーで消去され（accumFactorに従う）、水滴の下には存在しない
                 float wiperClear = lerp(1.0, accumFactor, inZone);
                 float dropClear  = 1.0 - saturate(length(dropNorm) * 8.0);
                 float effectiveFrost = _FrostAmount * wiperClear * dropClear;
@@ -604,7 +604,7 @@ Shader "Custom/CarWindow"
                 float3 bgFrost = lerp(bgBlur, _FrostColor.rgb, effectiveFrost * 0.4);
                 float3 bg = lerp(bgClear, bgFrost, effectiveFrost) * _GlassTint.rgb;
 
-                // --- Fresnel + Reflection Probe ---
+                // --- フレネル + 反射プローブ ---
                 float3 N = normalize(i.worldNorm) * sign(facing);
                 float3 V = normalize(UnityWorldSpaceViewDir(i.worldPos));
                 float  fresnel = pow(1.0 - saturate(dot(N, V)),
@@ -632,7 +632,7 @@ Shader "Custom/CarWindow"
                 #endif
                 refl *= _Reflectivity;
 
-                // --- Drop specular ---
+                // --- 水滴スペキュラー ---
                 float3 dropN  = normalize(float3(dropNorm * 6.0, 1.0));
                 float3 lDir   = normalize(float3(0.3, 1.0, 0.5));
                 float3 hVec   = normalize(V + lDir);
@@ -642,13 +642,13 @@ Shader "Custom/CarWindow"
                 float  streakSpec = pow(max(0.0, dot(streakN, hVec)), 16.0)
                                   * length(streakNorm) * _Reflectivity;
 
-                // --- Rim lighting ---
-                // dropN.z / streakN.z = 1 at surface center, < 1 at edges
+                // --- リムライティング ---
+                // dropN.z / streakN.z = 表面中心で1、端で1未満
                 float dropRim   = pow(saturate(1.0 - dropN.z),   2.0) * length(dropNorm);
                 float streakRim = pow(saturate(1.0 - streakN.z), 2.0) * length(streakNorm);
                 float3 rimCol   = (dropRim + streakRim) * _RimStrength * _RimColor.rgb;
 
-                // --- Composite ---
+                // --- 合成 ---
                 float3 col   = bg + refl * fresnel + spec + streakSpec + rimCol;
                 float  alpha = lerp(0.05, 0.8, fresnel) + length(dropNorm) * 0.15;
                 return float4(col, saturate(alpha));
