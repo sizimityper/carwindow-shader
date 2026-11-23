@@ -474,6 +474,8 @@ Shader "Custom/CarWindow"
             float2 BeadNormal(float2 uv, float dynamic, float accumFactor)
             {
                 float2 norm = float2(0, 0);
+                if (_RainAmount <= 0.0 || _SecondsSinceWet >= max(0.0, _DryDelay) + max(_DryDuration, 0.001))
+                    return norm;
 
                 // 3スケール: 大 / 中 / 小の水滴
                 [unroll]
@@ -579,8 +581,7 @@ Shader "Custom/CarWindow"
                 if (wz3 > 0.5) accumFactor = min(accumFactor, wa3);
 
                 // --- 水滴法線 ---
-                float2 dropNorm = float2(0, 0);
-                [branch] if (hasMoisture) dropNorm = BeadNormal(glassUV, inZone, accumFactor);
+                float2 dropNorm = BeadNormal(glassUV, inZone, accumFactor);
 
                 // --- ワイパーエッジ + 弧状筋 ---
                 // 各ワイパーの筋は、他のワイパーのゾーンがアクティブな場所でマスクされる
