@@ -7,6 +7,9 @@ Shader "Custom/CarWindow"
         _DropScale     ("Drop Scale",           Range(0.1,20)) = 1.0
         _RefractionStr ("Refraction Strength",  Range(0,1)) = 0.15
         _ReformRate    ("Drop Reform Rate",     Range(0.05,10)) = 0.3
+        _SecondsSinceWet ("Seconds Since Wet", Float) = 0
+        _DryDelay      ("Drying Delay (s)",      Float) = 0.5
+        _DryDuration   ("Drying Duration (s)",   Float) = 3.43
 
         // --- 霜 ---
         _FrostAmount   ("Frost Amount",         Range(0,1))   = 0.0
@@ -15,6 +18,8 @@ Shader "Custom/CarWindow"
         // --- ガラス ---
         _GlassTint     ("Glass Tint",           Color)        = (0.92, 0.96, 1.0, 1.0)
         _Reflectivity  ("Reflectivity",          Range(0,1))   = 0.8
+        _GlassOpacity  ("Base Glass Opacity",    Range(0,0.8)) = 0.05
+        _InsideGlassOpacity ("Inside Glass Opacity (-1 = Match Outside)", Range(-1,0.8)) = -1
 
         // --- リムライティング ---
         _RimStrength   ("Rim Strength",          Range(0, 3))  = 0.8
@@ -60,6 +65,11 @@ Shader "Custom/CarWindow"
             float  _DropScale;
             float  _RefractionStr;
             float  _ReformRate;
+            float  _SecondsSinceWet;
+            float  _DryDelay;
+            float  _DryDuration;
+            float  _GlassOpacity;
+            float  _InsideGlassOpacity;
             float  _FrostAmount;
             float4 _FrostColor;
             float  _WiperStreakWidth;
@@ -548,13 +558,18 @@ Shader "Custom/CarWindow"
             float4 frag(v2f i, float facing : VFACE) : SV_Target
             {
                 float2 glassUV = i.glassUV;
+                // 水滴と水筋だけを乾かし、乾いたガラスの透過色は維持する。
+                float dryStart = max(0.0, _DryDelay);
+                float wetness = 1.0 - smoothstep(dryStart, dryStart + max(_DryDuration, 0.001), _SecondsSinceWet);
+                bool hasMoisture = _RainAmount > 0.0 && wetness > 0.0;
+                bool useWipers = hasMoisture || _FrostAmount > 0.0;
 
                 // --- ワイパーゾーンテスト: ワイパーごとに1回呼び出し、スカラーとして保存（動的インデックス不可）---
                 float wz0 = 0, wa0 = 1, wz1 = 0, wa1 = 1, wz2 = 0, wa2 = 1, wz3 = 0, wa3 = 1;
-                if (_WiperAngles[0].z >= 0.5) { float2 r = WiperTest(glassUV, 0); wz0 = r.x; wa0 = r.y; }
-                if (_WiperAngles[1].z >= 0.5) { float2 r = WiperTest(glassUV, 1); wz1 = r.x; wa1 = r.y; }
-                if (_WiperAngles[2].z >= 0.5) { float2 r = WiperTest(glassUV, 2); wz2 = r.x; wa2 = r.y; }
-                if (_WiperAngles[3].z >= 0.5) { float2 r = WiperTest(glassUV, 3); wz3 = r.x; wa3 = r.y; }
+                if (useWipers && _WiperAngles[0].z >= 0.5) { float2 r = WiperTest(glassUV, 0); wz0 = r.x; wa0 = r.y; }
+                if (useWipers && _WiperAngles[1].z >= 0.5) { float2 r = WiperTest(glassUV, 1); wz1 = r.x; wa1 = r.y; }
+                if (useWipers && _WiperAngles[2].z >= 0.5) { float2 r = WiperTest(glassUV, 2); wz2 = r.x; wa2 = r.y; }
+                if (useWipers && _WiperAngles[3].z >= 0.5) { float2 r = WiperTest(glassUV, 3); wz3 = r.x; wa3 = r.y; }
 
                 float inZone      = max(max(wz0, wz1), max(wz2, wz3));
                 float accumFactor = 1.0;
@@ -564,16 +579,22 @@ Shader "Custom/CarWindow"
                 if (wz3 > 0.5) accumFactor = min(accumFactor, wa3);
 
                 // --- 水滴法線 ---
-                float2 dropNorm = BeadNormal(glassUV, inZone, accumFactor);
+                float2 dropNorm = float2(0, 0);
+                [branch] if (hasMoisture) dropNorm = BeadNormal(glassUV, inZone, accumFactor);
 
                 // --- ワイパーエッジ + 弧状筋 ---
                 // 各ワイパーの筋は、他のワイパーのゾーンがアクティブな場所でマスクされる
                 // ワイパーNのotherZone = N以外の全ワイパーのwz*の最大値
                 float2 streakNorm = float2(0, 0);
-                streakNorm += (WiperEdgeStreak(glassUV, 0) + WiperArcStreak(glassUV, 0)) * (1.0 - max(max(wz1, wz2), wz3));
-                streakNorm += (WiperEdgeStreak(glassUV, 1) + WiperArcStreak(glassUV, 1)) * (1.0 - max(max(wz0, wz2), wz3));
-                streakNorm += (WiperEdgeStreak(glassUV, 2) + WiperArcStreak(glassUV, 2)) * (1.0 - max(max(wz0, wz1), wz3));
-                streakNorm += (WiperEdgeStreak(glassUV, 3) + WiperArcStreak(glassUV, 3)) * (1.0 - max(max(wz0, wz1), wz2));
+                [branch] if (hasMoisture)
+                {
+                    streakNorm += (WiperEdgeStreak(glassUV, 0) + WiperArcStreak(glassUV, 0)) * (1.0 - max(max(wz1, wz2), wz3));
+                    streakNorm += (WiperEdgeStreak(glassUV, 1) + WiperArcStreak(glassUV, 1)) * (1.0 - max(max(wz0, wz2), wz3));
+                    streakNorm += (WiperEdgeStreak(glassUV, 2) + WiperArcStreak(glassUV, 2)) * (1.0 - max(max(wz0, wz1), wz3));
+                    streakNorm += (WiperEdgeStreak(glassUV, 3) + WiperArcStreak(glassUV, 3)) * (1.0 - max(max(wz0, wz1), wz2));
+                }
+                dropNorm *= wetness;
+                streakNorm *= wetness;
                 dropNorm += streakNorm * 0.5;
 
                 // --- GrabPass屈折 + 霜ブラー ---
@@ -650,7 +671,8 @@ Shader "Custom/CarWindow"
 
                 // --- 合成 ---
                 float3 col   = bg + refl * fresnel + spec + streakSpec + rimCol;
-                float  alpha = lerp(0.05, 0.8, fresnel) + length(dropNorm) * 0.15;
+                float glassAlpha = facing < 0.0 && _InsideGlassOpacity >= 0.0 ? _InsideGlassOpacity : _GlassOpacity;
+                float  alpha = lerp(glassAlpha, 0.8, fresnel) + length(dropNorm) * 0.15;
                 return float4(col, saturate(alpha));
             }
             ENDCG
