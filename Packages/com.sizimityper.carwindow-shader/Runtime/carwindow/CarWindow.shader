@@ -463,6 +463,7 @@ Shader "Custom/CarWindow"
             // =========================================================
             float2 BeadNormal(float2 uv, float dynamic, float accumFactor)
             {
+                if (dynamic > 0.5 && accumFactor <= 0.0) return float2(0, 0);
                 float2 norm = float2(0, 0);
 
                 // 3スケール: 大 / 中 / 小の水滴
@@ -564,7 +565,12 @@ Shader "Custom/CarWindow"
                 if (wz3 > 0.5) accumFactor = min(accumFactor, wa3);
 
                 // --- 水滴法線 ---
-                float2 dropNorm = BeadNormal(glassUV, inZone, accumFactor);
+                // 拭き取った直後は水滴を消し、完全に戻る時刻を維持する。
+                float reformDuration = max(_WiperPeriod, 0.001) * _ReformRate;
+                float clearDuration = min(0.2, reformDuration * 0.5);
+                float dropAccumFactor = (accumFactor * reformDuration - clearDuration)
+                                      / max(reformDuration - clearDuration, 1e-5);
+                float2 dropNorm = BeadNormal(glassUV, inZone, dropAccumFactor);
 
                 // --- ワイパーエッジ + 弧状筋 ---
                 // 各ワイパーの筋は、他のワイパーのゾーンがアクティブな場所でマスクされる
